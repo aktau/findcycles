@@ -2,16 +2,20 @@ package main
 
 import (
 	"io"
+	"io/ioutil"
 	"log"
 	"os"
 
 	"github.com/awalterschulze/gographviz"
-	"github.com/awalterschulze/gographviz/parser"
 )
 
 func main() {
 	// Create an Abstract Syntax Tree (AST) from a DOT representation.
-	ast, err := parser.Parse(os.Stdin)
+	b, err := ioutil.ReadAll(os.Stdin)
+	if err != nil {
+		log.Fatal(err)
+	}
+	ast, err := gographviz.Parse(b)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -30,7 +34,7 @@ func main() {
 	// To render a graph consisting only of cycles:
 	//
 	// 1. Create a new graph.
-	// 2. Loop over all edges int he input graph.
+	// 2. Loop over all edges in the input graph.
 	// 3. Add an edge to the new graph if both the source and the
 	//    destination are in a cycle.
 	fg := gographviz.NewGraph()
@@ -40,11 +44,20 @@ func main() {
 		if r[edge.Src] && r[edge.Dst] {
 			fg.AddNode("", edge.Src, nil)
 			fg.AddNode("", edge.Dst, nil)
-			fg.AddEdge(edge.Src, edge.Dst, true, edge.Attrs.Copy())
+			fg.AddEdge(edge.Src, edge.Dst, true, attrsToMap(edge.Attrs))
 		}
 	}
 
 	io.WriteString(os.Stdout, fg.String())
+}
+
+func attrsToMap(attrs gographviz.Attrs) map[string]string {
+	ret := make(map[string]string)
+	for k, v := range attrs {
+		ret[string(k)] = v
+
+	}
+	return ret
 }
 
 // Cycles returns a set of all nodes that are involved in cycles starting in
@@ -53,12 +66,12 @@ func main() {
 // like implementing Johnson's algorithm. If you want that, Python has a
 // library called networkx, which has a simple_cycles() function that uses
 // an efficient algorithm.
-func cycles(start string, adj map[string]map[string]*gographviz.Edge) map[string]bool {
+func cycles(start string, adj map[string]map[string][]*gographviz.Edge) map[string]bool {
 	return dfs(start, start, nil, adj)
 }
 
 // dfs returns all nodes that are in a simple cycle starting in start.
-func dfs(start, cur string, stack []string, adj map[string]map[string]*gographviz.Edge) map[string]bool {
+func dfs(start, cur string, stack []string, adj map[string]map[string][]*gographviz.Edge) map[string]bool {
 	// Check for cycle or cross.
 	if in(stack, cur) {
 		if cur == start {
